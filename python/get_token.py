@@ -33,7 +33,7 @@ if __name__ == '__main__':
     headers = {
         'Content-Type': 'application/json'
     }
-    password = 'Mperi_1512'
+    password = 'xxxxxx'
     sha256_hash = hashlib.sha256()
     sha256_hash.update(password.encode('utf-8'))
     passwordWith256 = sha256_hash.hexdigest()
