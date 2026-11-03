@@ -1,3 +1,4 @@
+import sys
 import requests
 from clientcode import variable
 from datetime import datetime
@@ -15,8 +16,21 @@ if __name__ == '__main__':
     If granularity is 4(year), the field ‘startAt’ and 'endAt’should be in format 'yyyy’. Return the yearly data between ‘startAt’ to ‘endAt’.
     """
 
-    mes_actual = datetime.now().strftime("%Y-%m")
+    parametre = sys.argv[1] if len(sys.argv) > 1 else None
+    
+    if parametre is not None and int(parametre) < 0:
+        
+        avui = datetime.now()
+        
+        mes_anterior = avui.strftime("%Y-") + str(avui.month + int(parametre)).zfill(2)
+        
+        mes_actual = mes_anterior
 
+    else:
+        
+        mes_actual = datetime.now().strftime("%Y-%m")
+    
+    
     data = {
         "stationId": 62563444,        # Replace with your stationId in deyecloud
         "granularity": 3,           # The granularity of the telemetry data frame

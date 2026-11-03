@@ -1,107 +1,10 @@
-<?php
-
-header('Content-Type: text/html; charset=utf-8');
-
-$command = 'python3 /home/pi/deyecloud/python/dades_estacio.py 2>&1';
-
-$output = array();
-$returnCode = 0;
-
-exec($command, $output, $returnCode);
-
-if ($returnCode !== 0) {
-    echo "<p>Error executant Python:</p>";
-    echo "<pre>" . htmlspecialchars(implode("\n", $output)) . "</pre>";
-    exit;
-}
-
-$resultat = implode("\n", $output);
-
-// Busquem els tres valors
-preg_match("/'consumptionPower':\s*([-0-9.]+)/", $resultat, $consumption);
-preg_match("/'wirePower':\s*([-0-9.]+)/", $resultat, $wire);
-preg_match("/'generationPower':\s*([-0-9.]+)/", $resultat, $generation);
-
-if (!isset($consumption[1]) || !isset($wire[1]) || !isset($generation[1])) {
-    echo "<p>No s'han pogut trobar els valors.</p>";
-    exit;
-}
-
-// Classe segons el valor
-$consumptionClass = ($consumption[1] >= 0) ? 'positiu' : 'negatiu';
-$wireClass = ($wire[1] < 0) ? 'positiu' : 'negatiu';
-$generationClass = ($generation[1] >= 0) ? 'positiu' : 'negatiu';
-
-
-// ------- Agafem historic mensual ---------------------------------------------------
-
-$command = 'python3 /home/pi/deyecloud/python/mes.py 2>&1';
-
-$output = array();
-$returnCode = 0;
-
-exec($command, $output, $returnCode);
-
-if ($returnCode !== 0) {
-    echo "<p>Error executant Python:</p>";
-    echo "<pre>" . htmlspecialchars(implode("\n", $output)) . "</pre>";
-    exit;
-}
-
-$resultat = implode("\n", $output);
-
-preg_match("/'purchaseValue':\s*([-0-9.]+)/", $resultat, $purchaseMes);
-preg_match("/'generationValue':\s*([-0-9.]+)/", $resultat, $generationMes);
-preg_match("/'gridValue':\s*([-0-9.]+)/", $resultat, $gridMes);
-
-$purchaseMesClass = ($purchaseMes[1] >= 0) ? 'positiu' : 'negatiu';
-$generationMesClass = ($generationMes[1] >= 0) ? 'positiu' : 'negatiu';
-$gridMesClass = ($gridMes[1] >= 0) ? 'positiu' : 'negatiu';
-
-
-// ----- Agafem totals diaris --------------------------------------------------------
-
-$command = 'python3 /home/pi/deyecloud/python/dia1.py 2>&1';
-
-$output = array();
-$returnCode = 0;
-
-exec($command, $output, $returnCode);
-
-if ($returnCode !== 0) {
-    echo "<p>Error executant Python:</p>";
-    echo "<pre>" . htmlspecialchars(implode("\n", $output)) . "</pre>";
-    exit;
-}
-
-$resultat = implode("\n", $output);
-
-/*preg_match("/'purchaseValue':\s*([-0-9.]+)/", $resultat, $purchaseDia);
-preg_match("/'generationValue':\s*([-0-9.]+)/", $resultat, $generationDia);
-preg_match("/'gridValue':\s*([-0-9.]+)/", $resultat, $gridDia);
-*/
-preg_match("/Produccio avui:\s*([-0-9.]+)\s*kWh/", $resultat, $generationDia);
-preg_match("/Venut avui:\s*([-0-9.]+)\s*kWh/", $resultat, $gridDia);
-preg_match("/Comprat avui:\s*([-0-9.]+)\s*kWh/", $resultat, $purchaseDia);
-
-
-$purchaseDiaClass = ($purchaseDia[1] >= 0) ? 'positiu' : 'negatiu';
-$generationDiaClass = ($generationDia[1] >= 0) ? 'positiu' : 'negatiu';
-$gridDiaClass = ($gridDia[1] >= 0) ? 'positiu' : 'negatiu';
-
-?>
-
 <!DOCTYPE html>
 <html lang="ca">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta http-equiv="refresh" content="120">
-
+    <meta http-equiv="refresh" content="180">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Inversor Deye</title>
 
     <!-- Font Awesome -->
@@ -134,6 +37,24 @@ $gridDiaClass = ($gridDia[1] >= 0) ? 'positiu' : 'negatiu';
             margin: 18px 0;
             padding: 25px 15px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            transition: background-color 0.15s ease;
+            cursor: pointer;
+        }
+
+        .valor:hover,
+        .valor:active {
+            background: #333333;
+        }
+
+        .valor .botons {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease;
+        }
+
+        .valor:hover .botons {
+            opacity: 1;
+            visibility: visible;
         }
 
         .literal {
@@ -179,9 +100,7 @@ $gridDiaClass = ($gridDia[1] >= 0) ? 'positiu' : 'negatiu';
             opacity: 0.6;
         }
 
-
         /* Botó euros */
-
         .boto-euro {
             position: absolute;
             right: 12px;
@@ -200,416 +119,416 @@ $gridDiaClass = ($gridDia[1] >= 0) ? 'positiu' : 'negatiu';
         .boto-euro:hover {
             background: #444444;
         }
-    </style>
 
+        /* Botó calendari */
+        .boto-calendari {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 42px;
+            height: 42px;
+            padding: 0;
+            border: none;
+            border-radius: 10px;
+            background: #333333;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .boto-calendari:hover {
+            background: #444444;
+        }
+
+        .botons {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .botons button {
+            position: static !important;
+            margin: 0;
+        }
+
+        .botons:has(> button:only-child) {
+            top: auto;
+            bottom: 15px;
+        }
+
+        /* Modal de progrés AJAX - VISIBLE PER DEFECTE */
+        #ajaxLoading {
+            display: flex;
+            position: fixed;
+            z-index: 99999;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.65);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ajaxLoadingBox {
+            background: #1e1e1e;
+            border-radius: 15px;
+            padding: 25px 35px;
+            text-align: center;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.6);
+            font-size: 18px;
+        }
+
+        .ajaxLoadingBox i {
+            font-size: 35px;
+            margin-bottom: 12px;
+        }
+    </style>
 </head>
 
 <body>
+
+    <!-- MODAL DE PROGRÉS (Actiu d'inici) -->
+    <div id="ajaxLoading">
+        <div class="ajaxLoadingBox">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            <div>Carregant...</div>
+        </div>
+    </div>
 
     <div class="contenidor">
 
         <h1>Inversor Deye</h1>
 
-
-        <div class="updated">
-            Última actualització <?php echo date('d/m/Y H:i:s'); ?>
+        <div class="updated" id="updatedText">
+            Carregant dades actualitzades...
         </div>
 
-
         <!-- PRODUCCIÓ SOLAR ACTUAL -->
-
         <div class="valor">
-
             <div class="literal">
                 <i class="fa-solid fa-sun"></i>
                 Producció solar actual
             </div>
-
-            <span class="numero <?php echo $generationClass; ?>">
-                <?php echo $generation[1]; ?>
-            </span>
-
+            <span id="generationValor" class="numero">--</span>
             <span class="unitat">W</span>
-
         </div>
 
-
         <!-- CONSUM ACTUAL -->
-
         <div class="valor">
-
             <div class="literal">
                 <i class="fa-solid fa-house"></i>
                 Consum actual
             </div>
-
-            <span class="numero <?php echo $consumptionClass; ?>">
-                <?php echo $consumption[1]; ?>
-            </span>
-
+            <span id="consumptionValor" class="numero">--</span>
             <span class="unitat">W</span>
-
         </div>
 
-
         <!-- COMPRAT ACTUAL -->
-
         <div class="valor">
-
             <div class="literal">
                 <i class="fa-solid fa-bolt"></i>
                 Comprat actual
             </div>
-
-            <span class="numero <?php echo $wireClass; ?>">
-                <?php echo $wire[1]; ?>
-            </span>
-
+            <span id="wireValor" class="numero">--</span>
             <span class="unitat">W</span>
-
-        </div>
-
-
-        <!-- TOTAL COMPRAT MENSUAL -->
-
-        <div class="valor">
-
-            <div id="purchaseMesTitle" class="literal">
-                <i class="fa-solid fa-cart-shopping"></i>
-                Total comprat mensual
-            </div>
-
-            <span id="purchaseMesValor" class="numero <?php echo $purchaseMesClass; ?>">
-                <?php echo $purchaseMes[1]; ?>
-            </span>
-
-            <span id="purchaseMesUnitat" class="unitat">kWh</span>
-
-            <button type="button" id="purchaseMesEuro" class="boto-euro" title="Convertir a euros">
-
-                <i class="fa-solid fa-euro-sign"></i>
-
-            </button>
-
         </div>
 
         <!-- TOTAL COMPRAT DIARI -->
-
         <div class="valor">
-
             <div class="literal">
                 <i class="fa-solid fa-bag-shopping"></i>
                 Total comprat diari
             </div>
-
-            <span id="purchaseDiaValor" class="numero <?php echo $purchaseDiaClass; ?>">
-                <?php echo $purchaseDia[1]; ?>
-            </span>
-
+            <span id="purchaseDiaValor" class="numero">--</span>
             <span id="purchaseDiaUnitat" class="unitat">kWh</span>
-
-            <button type="button" id="purchaseDiaEuro" class="boto-euro" title="Convertir a euros">
-
-                <i class="fa-solid fa-euro-sign"></i>
-
-            </button>
-
+            <div class="botons">
+                <button type="button" id="purchaseDiaEuro" class="boto-euro" title="Convertir a euros">
+                    <i class="fa-solid fa-euro-sign"></i>
+                </button>
+            </div>
         </div>
 
-
         <!-- TOTAL VENUT / PRODUCCIÓ DIÀRIA -->
-
         <div class="valor">
-
             <div id="gridDiaTitle" class="literal">
                 <i class="fa-solid fa-coins"></i>Total venut / producció diària
             </div>
-
-            <span id="gridDiaValor" class="numero <?php echo $generationDiaClass; ?>">
-                <?php echo $gridDia[1]; ?> / <?php echo $generationDia[1]; ?>
-            </span>
-
+            <span id="gridDiaValor" class="numero">--</span>
             <span id="gridDiaUnitat" class="unitat">kWh</span>
-
-            <button type="button" id="gridDiaEuro" class="boto-euro" title="Convertir a euros">
-
-                <i class="fa-solid fa-euro-sign"></i>
-
-            </button>
-
+            <div class="botons">
+                <button type="button" id="gridDiaEuro" class="boto-euro" title="Convertir a euros">
+                    <i class="fa-solid fa-euro-sign"></i>
+                </button>
+            </div>
         </div>
 
+        <!-- TOTAL COMPRAT MENSUAL -->
+        <div class="valor">
+            <div id="purchaseMesTitle" class="literal">
+                <i class="fa-solid fa-cart-shopping"></i>
+                Total comprat mensual
+            </div>
+            <div class="botons">
+                <button type="button" id="purchaseMesCalendari" class="boto-calendari" title="Mes anterior kWh">
+                    <i class="fa-solid fa-calendar-days"></i>
+                </button>
+                <button type="button" id="purchaseMesCalendari2" class="boto-calendari" title="Mes anterior €">
+                    <i class="fa-solid fa-calendar"></i>
+                </button>
+                <button type="button" id="purchaseMesEuro" class="boto-euro" title="Mes actual €">
+                    <i class="fa-solid fa-euro-sign"></i>
+                </button>
+            </div>
+            <span id="purchaseMesValor" class="numero">--</span>
+            <span id="purchaseMesUnitat" class="unitat">kWh</span>
+        </div>
 
         <!-- TOTAL VENUT / PRODUCCIÓ MENSUAL -->
-
         <div class="valor">
-
             <div id="gridMesTitle" class="literal">
                 <i class="fa-solid fa-money-bill-wave"></i>Total venut / producció mensual
             </div>
-
-            <span id="gridMesValor" class="numero <?php echo $generationMesClass; ?>">
-                <?php echo $gridMes[1]; ?> / <?php echo $generationMes[1]; ?>
-            </span>
-
+            <span id="gridMesValor" class="numero">--</span>
             <span id="gridMesUnitat" class="unitat">kWh</span>
-
-            <button type="button" id="gridMesEuro" class="boto-euro" title="Convertir a euros">
-
-                <i class="fa-solid fa-euro-sign"></i>
-
-            </button>
-
+            <div class="botons">
+                <button type="button" id="gridMesCalendari" class="boto-calendari" title="Mes anterior kWh">
+                    <i class="fa-solid fa-calendar-days"></i>
+                </button>
+                <button type="button" id="gridMesCalendari2" class="boto-calendari" title="Mes anterior €">
+                    <i class="fa-solid fa-calendar"></i>
+                </button>
+                <button type="button" id="gridMesEuro" class="boto-euro" title="Convertir a euros">
+                    <i class="fa-solid fa-euro-sign"></i>
+                </button>
+            </div>
         </div>
-
 
     </div>
 
-
-    <!-- CONVERSIÓ kWh -> € -->
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.10.0/jquery.min.js"></script>
     <script>
-
-        document.addEventListener('DOMContentLoaded', function () {
-
-
-            // ============================================================
-            // TOTAL COMPRAT MENSUAL
-            // ============================================================
-
-            var boto_purchaseMesEuro = document.getElementById('purchaseMesEuro');
-
-            if (boto_purchaseMesEuro) {
-				
-				var purchaseMesTitle = document.getElementById('purchaseMesTitle');
-
-                var valorElement_purchaseMesValor =
-                    document.getElementById('purchaseMesValor');
-
-                var unitatElement_purchaseMesUnitat =
-                    document.getElementById('purchaseMesUnitat');
-
-                var enEuros_purchaseMesUnitat = false;
-
-                var valorKwh_purchaseMesUnitat = parseFloat(valorElement_purchaseMesValor.textContent.trim());
-				
-				//----------------------------------------------------------------------
-				var valorElement_gridMesValor = document.getElementById('gridMesValor');
-
-                var valorKwh_gridMesUnitat = parseFloat(
-                    valorElement_gridMesValor.textContent.trim()
-                );
-					
-                var eurosVenutMes = valorKwh_gridMesUnitat * 0.06;
-				
-				//---------------------------------------------------------------------
-
-                if (!isNaN(valorKwh_purchaseMesUnitat)) {
-
-                    boto_purchaseMesEuro.addEventListener('click', function () {
-
-                        if (!enEuros_purchaseMesUnitat) {
-							
-							purchaseMesTitle.innerHTML = "<i class=\"fa-solid fa-cart-shopping\"></i>Total comprat mes / Total net mes";
-
-                            // kWh -> euros
-                            var eurosCompratMes = valorKwh_purchaseMesUnitat * 0.16;
-							
-							var eurosNetMes = eurosCompratMes - eurosVenutMes
-
-                            valorElement_purchaseMesValor.textContent = eurosCompratMes.toFixed(2) + " / " + eurosNetMes.toFixed(2);
-
-                            unitatElement_purchaseMesUnitat.textContent = '€';
-
-                            boto_purchaseMesEuro.title = 'Mostrar kWh';
-
-                            enEuros_purchaseMesUnitat = true;
-
-                        } else {
-							
-							purchaseMesTitle.innerHTML = "<i class=\"fa-solid fa-cart-shopping\"></i>Total comprat mensual";
-
-                            // euros -> kWh
-                            valorElement_purchaseMesValor.textContent =
-                                valorKwh_purchaseMesUnitat;
-
-                            unitatElement_purchaseMesUnitat.textContent = 'kWh';
-
-                            boto_purchaseMesEuro.title = 'Convertir a euros';
-
-                            enEuros_purchaseMesUnitat = false;
-
-                        }
-
-                    });
-
-                }
-
-            }
-
-
-            // ============================================================
-            // TOTAL COMPRAT DIARI
-            // ============================================================
-
-            var boto_purchaseDiaEuro = document.getElementById('purchaseDiaEuro');
-
-            if (boto_purchaseDiaEuro) {
-
-                var valorElement_purchaseDiaValor =
-                    document.getElementById('purchaseDiaValor');
-
-                var unitatElement_purchaseDiaUnitat =
-                    document.getElementById('purchaseDiaUnitat');
-
-                var enEuros_purchaseDiaUnitat = false;
-
-                var valorKwh_purchaseDiaUnitat = parseFloat(
-                    valorElement_purchaseDiaValor.textContent.trim()
-                );
-
-                if (!isNaN(valorKwh_purchaseDiaUnitat)) {
-
-                    boto_purchaseDiaEuro.addEventListener('click', function () {
-
-                        if (!enEuros_purchaseDiaUnitat) {
-
-                            // kWh -> euros
-                            var euros = valorKwh_purchaseDiaUnitat * 0.16;
-
-                            valorElement_purchaseDiaValor.textContent =
-                                euros.toFixed(2);
-                            unitatElement_purchaseDiaUnitat.textContent = '€';
-                            boto_purchaseDiaEuro.title = 'Mostrar kWh';
-                            enEuros_purchaseDiaUnitat = true;
-
-                        } else {
-
-                            // euros -> kWh
-                            valorElement_purchaseDiaValor.textContent =
-                                valorKwh_purchaseDiaUnitat;
-                            unitatElement_purchaseDiaUnitat.textContent = 'kWh';
-                            boto_purchaseDiaEuro.title = 'Convertir a euros';
-                            enEuros_purchaseDiaUnitat = false;
-
-                        }
-
-                    });
-                }
-            }
-
-            // ============================================================
-            // TOTAL VENUT DIARI
-            // ============================================================
-
-            var boto_gridDiaEuro = document.getElementById('gridDiaEuro');
-
-            if (boto_gridDiaEuro) {
-
-                var gridDiaTitle = document.getElementById('gridDiaTitle');
-
-                var valorElement_gridDiaValor =
-                    document.getElementById('gridDiaValor');
-
-                var unitatElement_gridDiaUnitat =
-                    document.getElementById('gridDiaUnitat');
-
-                var enEuros_gridDiaUnitat = false;
-
-                var valorKwh_gridDiaUnitat = parseFloat(
-                    valorElement_gridDiaValor.textContent.trim()
-                );
-
-                var valorKwh_gridDiaComplet = valorElement_gridDiaValor.textContent;
-
-                if (!isNaN(valorKwh_gridDiaUnitat)) {
-
-                    boto_gridDiaEuro.addEventListener('click', function () {
-
-                        if (!enEuros_gridDiaUnitat) {
-
-                            gridDiaTitle.innerHTML = "<i class=\"fa-solid fa-coins\"></i>Total venut diari";
-
-                            var euros = valorKwh_gridDiaUnitat * 0.06;
-
-                            valorElement_gridDiaValor.textContent =
-                                euros.toFixed(2);
-                            unitatElement_gridDiaUnitat.textContent = '€';
-                            boto_gridDiaEuro.title = 'Mostrar kWh';
-                            enEuros_gridDiaUnitat = true;
-                        } else {
-                            gridDiaTitle.innerHTML = "<i class=\"fa-solid fa-coins\"></i>Total venut / producció diària";
-
-                            valorElement_gridDiaValor.textContent =
-                                valorKwh_gridDiaComplet;
-                            unitatElement_gridDiaUnitat.textContent = 'kWh';
-                            boto_gridDiaEuro.title = 'Convertir a euros';
-                            enEuros_gridDiaUnitat = false;
-                        }
-
-                    });
-                }
-            }
-			
-           // ============================================================
-            // TOTAL VENUT MENSUAL
-            // ============================================================
-
-            var boto_gridMesEuro = document.getElementById('gridMesEuro');
-
-            if (boto_gridMesEuro) {
-
-                var gridMesTitle = document.getElementById('gridMesTitle');
-
-                var valorElement_gridMesValor =
-                    document.getElementById('gridMesValor');
-
-                var unitatElement_gridMesUnitat =
-                    document.getElementById('gridMesUnitat');
-
-                var enEuros_gridMesUnitat = false;
-
-                var valorKwh_gridMesUnitat = parseFloat(
-                    valorElement_gridMesValor.textContent.trim()
-                );
-
-                var valorKwh_gridMesComplet = valorElement_gridMesValor.textContent;
-
-                if (!isNaN(valorKwh_gridMesUnitat)) {
-
-                    boto_gridMesEuro.addEventListener('click', function () {
-
-                        if (!enEuros_gridMesUnitat) {
-
-                            gridMesTitle.innerHTML = "<i class=\"fa-solid fa-money-bill-wave\"></i>Total venut mensual";    
-
-                            var euros = valorKwh_gridMesUnitat * 0.06;
-
-                            valorElement_gridMesValor.textContent =
-                                euros.toFixed(2);
-                            unitatElement_gridMesUnitat.textContent = '€';
-                            boto_gridMesEuro.title = 'Mostrar kWh';
-                            enEuros_gridMesUnitat = true;
-                        } else {
-
-                            gridMesTitle.innerHTML = "<i class=\"fa-solid fa-money-bill-wave\"></i>Total venut / producció mensual";
-
-                            valorElement_gridMesValor.textContent =
-                                valorKwh_gridMesComplet;
-                            unitatElement_gridMesUnitat.textContent = 'kWh';
-                            boto_gridMesEuro.title = 'Convertir a euros';
-                            enEuros_gridMesUnitat = false;
-                        }
-
-                    });
-                }
-            }
-
-              // ---------------------------------------------------------
+        $(document).ajaxStart(function () {
+            $("#ajaxLoading").css("display", "flex");
         });
 
-    </script>
+        $(document).ajaxStop(function () {
+            $("#ajaxLoading").css("display", "none");
+        });
 
+        var preu_venta = 0.06;
+        var preu_compra = 0.1649;
+
+
+      // ..........
+       // Càrrega inicial de dades via AJAX
+        function carregarDadesInicials() {
+            $.ajax({
+                url: "./deye_get_data.php",
+                type: "GET",
+                dataType: "json",
+                success: function (data) {
+                    $("#updatedText").text("Última actualització " + data.updated);
+
+                    $("#generationValor").text(data.generation).attr("class", "numero " + data.generationClass);
+                    $("#consumptionValor").text(data.consumption).attr("class", "numero " + data.consumptionClass);
+                    $("#wireValor").text(data.wire).attr("class", "numero " + data.wireClass);
+
+                    $("#purchaseDiaValor").text(data.purchaseDia).attr("class", "numero " + data.purchaseDiaClass);
+                    $("#gridDiaValor").text(data.gridDia + " / " + data.generationDia).attr("class", "numero " + data.generationDiaClass);
+
+                    $("#purchaseMesValor").text(data.purchaseMes).attr("class", "numero " + data.purchaseMesClass);
+                    $("#gridMesValor").text(data.gridMes + " / " + data.generationMes).attr("class", "numero " + data.generationMesClass);
+
+                    LoadData();
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error carregant dades:", error);
+                    alert("Error carregant les dades inicials.");
+                }
+            });
+        }
+
+        function LoadData() {
+            // Lògica dels botons de conversió diaris
+            var boto_purchaseDiaEuro = document.getElementById('purchaseDiaEuro');
+            var boto_gridDiaEuro = document.getElementById('gridDiaEuro');
+
+            if (boto_purchaseDiaEuro && boto_gridDiaEuro && !boto_purchaseDiaEuro.dataset.eventsRegistrats && !boto_gridDiaEuro.dataset.eventsRegistrats) {
+                var valorElement_purchaseDiaValor = document.getElementById('purchaseDiaValor');
+                var unitatElement_purchaseDiaUnitat = document.getElementById('purchaseDiaUnitat');
+                var valorElement_gridDiaValor = document.getElementById('gridDiaValor');
+                var unitatElement_gridDiaUnitat = document.getElementById('gridDiaUnitat');
+                var gridDiaTitle = document.getElementById('gridDiaTitle');
+
+                if (valorElement_purchaseDiaValor && unitatElement_purchaseDiaUnitat && valorElement_gridDiaValor && unitatElement_gridDiaUnitat && gridDiaTitle) {
+                    var valorKwh_purchaseDia = parseFloat(valorElement_purchaseDiaValor.textContent.trim());
+                    var valorKwh_gridDia = parseFloat(valorElement_gridDiaValor.textContent.trim());
+                    var valorKwh_gridDiaComplet = valorElement_gridDiaValor.textContent;
+                    var enEurosDia = false;
+
+                    if (!isNaN(valorKwh_purchaseDia) && !isNaN(valorKwh_gridDia)) {
+                        function canviarUnitatsDia() {
+                            if (!enEurosDia) {
+                                valorElement_purchaseDiaValor.textContent = (valorKwh_purchaseDia * preu_compra).toFixed(2);
+                                unitatElement_purchaseDiaUnitat.textContent = '€';
+                                boto_purchaseDiaEuro.title = 'Mostrar kWh';
+
+                                valorElement_gridDiaValor.textContent = (valorKwh_gridDia * preu_venta).toFixed(2);
+                                unitatElement_gridDiaUnitat.textContent = '€';
+                                boto_gridDiaEuro.title = 'Mostrar kWh';
+
+                                gridDiaTitle.innerHTML = '<i class="fa-solid fa-coins"></i> Total venut diari';
+                                enEurosDia = true;
+                            } else {
+                                valorElement_purchaseDiaValor.textContent = valorKwh_purchaseDia;
+                                unitatElement_purchaseDiaUnitat.textContent = 'kWh';
+                                boto_purchaseDiaEuro.title = 'Convertir a euros';
+
+                                valorElement_gridDiaValor.textContent = valorKwh_gridDiaComplet;
+                                unitatElement_gridDiaUnitat.textContent = 'kWh';
+                                boto_gridDiaEuro.title = 'Convertir a euros';
+
+                                gridDiaTitle.innerHTML = '<i class="fa-solid fa-coins"></i> Total venut / producció diària';
+                                enEurosDia = false;
+                            }
+                        }
+
+                        boto_purchaseDiaEuro.addEventListener('click', canviarUnitatsDia);
+                        boto_gridDiaEuro.addEventListener('click', canviarUnitatsDia);
+                        boto_purchaseDiaEuro.dataset.eventsRegistrats = 'true';
+                        boto_gridDiaEuro.dataset.eventsRegistrats = 'true';
+                    }
+                }
+            }
+
+            // Lògica dels botons de conversió mensuals (unificats)
+            var boto_purchaseMesEuro = document.getElementById('purchaseMesEuro');
+            var boto_gridMesEuro = document.getElementById('gridMesEuro');
+
+            if (boto_purchaseMesEuro && boto_gridMesEuro && !boto_purchaseMesEuro.dataset.eventsRegistrats && !boto_gridMesEuro.dataset.eventsRegistrats) {
+                var purchaseMesTitle = document.getElementById('purchaseMesTitle');
+                var gridMesTitle = document.getElementById('gridMesTitle');
+                var valorElement_purchaseMesValor = document.getElementById('purchaseMesValor');
+                var unitatElement_purchaseMesUnitat = document.getElementById('purchaseMesUnitat');
+                var valorElement_gridMesValor = document.getElementById('gridMesValor');
+                var unitatElement_gridMesUnitat = document.getElementById('gridMesUnitat');
+
+                if (purchaseMesTitle && gridMesTitle && valorElement_purchaseMesValor && unitatElement_purchaseMesUnitat && valorElement_gridMesValor && unitatElement_gridMesUnitat) {
+                    var valorKwh_purchaseMes = parseFloat(valorElement_purchaseMesValor.textContent.trim());
+                    var valorKwh_purchaseMesComplet = valorElement_purchaseMesValor.textContent;
+                    var valorKwh_gridMesUnitat = parseFloat(valorElement_gridMesValor.textContent.trim());
+                    var valorKwh_gridMesComplet = valorElement_gridMesValor.textContent;
+                    var enEurosMes = false;
+
+                    if (!isNaN(valorKwh_purchaseMes) && !isNaN(valorKwh_gridMesUnitat)) {
+                        function canviarUnitatsMes() {
+                            if (!enEurosMes) {
+                                purchaseMesTitle.innerHTML = '<i class="fa-solid fa-cart-shopping"></i> Total comprat mes / Total net mes';
+                                var eurosCompratMes = valorKwh_purchaseMes * preu_compra;
+                                var eurosVenutMes = valorKwh_gridMesUnitat * preu_venta;
+                                var eurosNetMes = eurosCompratMes - eurosVenutMes;
+
+                                valorElement_purchaseMesValor.textContent = eurosCompratMes.toFixed(2) + ' / ' + eurosNetMes.toFixed(2);
+                                unitatElement_purchaseMesUnitat.textContent = '€';
+                                boto_purchaseMesEuro.title = 'Mostrar kWh';
+
+                                gridMesTitle.innerHTML = '<i class="fa-solid fa-money-bill-wave"></i> Total venut mensual';
+                                valorElement_gridMesValor.textContent = eurosVenutMes.toFixed(2);
+                                unitatElement_gridMesUnitat.textContent = '€';
+                                boto_gridMesEuro.title = 'Mostrar kWh';
+
+                                enEurosMes = true;
+                            } else {
+                                purchaseMesTitle.innerHTML = '<i class="fa-solid fa-cart-shopping"></i> Total comprat mensual';
+                                valorElement_purchaseMesValor.textContent = valorKwh_purchaseMesComplet;
+                                unitatElement_purchaseMesUnitat.textContent = 'kWh';
+                                boto_purchaseMesEuro.title = 'Convertir a euros';
+
+                                gridMesTitle.innerHTML = '<i class="fa-solid fa-money-bill-wave"></i> Total venut / producció mensual';
+                                valorElement_gridMesValor.textContent = valorKwh_gridMesComplet;
+                                unitatElement_gridMesUnitat.textContent = 'kWh';
+                                boto_gridMesEuro.title = 'Convertir a euros';
+
+                                enEurosMes = false;
+                            }
+                        }
+
+                        boto_purchaseMesEuro.addEventListener('click', canviarUnitatsMes);
+                        boto_gridMesEuro.addEventListener('click', canviarUnitatsMes);
+                        boto_purchaseMesEuro.dataset.eventsRegistrats = 'true';
+                        boto_gridMesEuro.dataset.eventsRegistrats = 'true';
+                    }
+                }
+            }
+        }
+
+      // ..........
+
+
+
+
+        document.getElementById("purchaseMesCalendari").addEventListener("click", carregarCalendari);
+        document.getElementById("purchaseMesCalendari2").addEventListener("click", carregarCalendari2);
+        document.getElementById("gridMesCalendari").addEventListener("click", carregarCalendari);
+        document.getElementById("gridMesCalendari2").addEventListener("click", carregarCalendari2);
+
+        function carregarCalendari() {
+            $.ajax({
+                url: "./deye_mes.php",
+                type: "POST",
+                dataType: "json",
+                data: { mes: "-1" },
+                success: function (data) {
+                    $("#purchaseMesTitle").html('<i class="fa-solid fa-cart-shopping"></i> Total comprat mes ant.');
+                    $("#gridMesTitle").html('<i class="fa-solid fa-money-bill-wave"></i> Total venut mes ant.');
+                    $("#purchaseMesValor").text(data.stationDataItems[0].purchaseValue);
+                    $("#gridMesValor").text(data.stationDataItems[0].gridValue);
+                    $("#generationMesValor").text(data.stationDataItems[0].generationValue);
+                    $("#purchaseMesUnitat").text("kWh");
+                    $("#gridMesUnitat").text("kWh");
+                },
+                error: function (xhr, status, error) {
+                    alert("Error: " + xhr.responseText);
+                }
+            });
+        }
+
+        function carregarCalendari2() {
+            $.ajax({
+                url: "./deye_mes.php",
+                type: "POST",
+                dataType: "json",
+                data: { mes: "-1" },
+                success: function (data) {
+                    $("#purchaseMesTitle").html('<i class="fa-solid fa-cart-shopping"></i> Total comprat mes ant. / net ant.');
+                    $("#gridMesTitle").html('<i class="fa-solid fa-money-bill-wave"></i> Total venut mes ant.');
+                    var purchaseMesValor = data.stationDataItems[0].purchaseValue;
+                    var gridMesValor = data.stationDataItems[0].gridValue;
+                    var purchaseMesEuros = (purchaseMesValor * preu_compra);
+                    var gridMesEuros = (gridMesValor * preu_venta);
+                    var netEuros = purchaseMesEuros - gridMesEuros;
+
+                    $("#purchaseMesValor").text(purchaseMesEuros.toFixed(2) + " / " + netEuros.toFixed(2));
+                    $("#gridMesValor").text(gridMesEuros.toFixed(2));
+                    $("#generationMesValor").text(data.stationDataItems[0].generationValue);
+                    $("#purchaseMesUnitat").text("€");
+                    $("#gridMesUnitat").text("€");
+                },
+                error: function (xhr, status, error) {
+                    alert("Error: " + xhr.responseText);
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            carregarDadesInicials();
+        });
+    </script>
 </body>
 
 </html>
